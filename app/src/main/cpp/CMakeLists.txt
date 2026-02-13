@@ -4,7 +4,7 @@ project(libmoxxie)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 
-add_library(libmoxxie SHARED libmoxxie.cpp)
+add_library(moxxie SHARED libmoxxie.cpp)
 
 find_library(log-lib log)
 
