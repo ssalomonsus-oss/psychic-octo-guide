@@ -12,12 +12,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract the only zip in root to root
+      - name: Extract and flatten zip
         run: |
           set -e
 
-          echo "🔍 Searching for zip in repo root..."
-
+          echo "🔍 Looking for zip in root..."
           ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
@@ -25,10 +24,27 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Found zip: $ZIP_FILE"
-          echo "📦 Extracting into repo root..."
-
+          echo "📦 Extracting $ZIP_FILE..."
           unzip -o "$ZIP_FILE"
 
-          echo "✅ Done. Root contents:"
+          echo "🔍 Checking for single extracted folder..."
+
+          # find top-level directories (excluding .git)
+          DIR_COUNT=$(find . -maxdepth 1 -type d ! -name "." ! -name ".git" | wc -l)
+
+          if [ "$DIR_COUNT" -eq 1 ]; then
+            TOP_DIR=$(find . -maxdepth 1 -type d ! -name "." ! -name ".git")
+            echo "📁 Found wrapper folder: $TOP_DIR"
+            echo "🚚 Moving contents to root..."
+            shopt -s dotglob
+            mv "$TOP_DIR"/* .
+            rm -rf "$TOP_DIR"
+          else
+            echo "ℹ️ No wrapper folder detected (or multiple folders)"
+          fi
+
+          echo "🧹 Removing zip..."
+          rm "$ZIP_FILE"
+
+          echo "✅ Final root contents:"
           ls -la
