@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      ANDROID_NDK_VERSION: "r25b"
+      ANDROID_NDK_VERSION: "26.1.10909125"
       ANDROID_API_LEVEL: "27"
       CMAKE_VERSION: "3.22.1"
       JAVA_VERSION: "17"
