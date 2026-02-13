@@ -1,0 +1,29 @@
+name: Build PC plugin (Windows MSBuild)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1
+      - name: Restore NuGet
+        shell: pwsh
+        run: nuget restore
+      - name: Build plugin
+        shell: pwsh
+        run: |
+          $proj = Get-ChildItem -Path . -Filter "*.csproj" -Recurse | Where-Object { $_.FullName -like '*PCMod*' } | Select-Object -First 1
+          if (-not $proj) { Write-Error 'PCMod project not found'; exit 1 }
+          msbuild.exe $proj.FullName /m /p:Configuration=Release /p:Platform="Any CPU" /verbosity:minimal
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcmod-dll
+          path: '**/bin/Release/*.dll'
