@@ -1,33 +1,27 @@
-#include <jni.h>
-#include <android/log.h>
-#include <cstring>
+cmake_minimum_required(VERSION 3.18)
+project(psychic-octo-guide LANGUAGES C CXX)
 
-#define LOG_TAG "libmoxxie"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-struct ModInfo {
-    const char* id;
-    const char* name;
-    const char* version;
-    const char* author;
-    const char* description;
-};
+# Subdirectory CMakeLists: current dir is app/src/main/cpp, so refer only to libmoxxie.cpp
+set(MOXXIE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/libmoxxie.cpp"
+    # or simply: "libmoxxie.cpp"
+)
 
-extern "C" void setup(ModInfo& info) {
-    info.id = "libmoxxie";
-    info.name = "libmoxxie";
-    info.version = "1.0.0";
-    info.author = "moxxie";
-    info.description = "HoldableTemplate Scotland2 test build";
-    LOGI("setup() called");
-}
+if(NOT EXISTS "${MOXXIE_SOURCES}")
+    message(FATAL_ERROR "Missing source file: ${MOXXIE_SOURCES}\nCheck that libmoxxie.cpp is in this directory.")
+endif()
 
-extern "C" void load() {
-    LOGI("libmoxxie load() called — mod initialized");
-}
+add_library(moxxie SHARED ${MOXXIE_SOURCES})
 
-extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    LOGI("JNI_OnLoad fired");
-    return JNI_VERSION_1_6;
-}
+find_library(log-lib log)
+if(log-lib)
+    target_link_libraries(moxxie PUBLIC ${log-lib})
+endif()
+
+set_target_properties(moxxie PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)
