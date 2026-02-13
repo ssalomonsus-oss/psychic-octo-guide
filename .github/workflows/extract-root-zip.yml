@@ -1,50 +1,58 @@
-name: Extract root zip
+name: Extract zip and Push
 
 on:
   push:
+    paths:
+      - 'HoldableTemplate_scotland2_ready.zip'
   workflow_dispatch:
 
 jobs:
-  extract:
+  extract-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # Checkout with PAT so we can push
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.Test }}
+          persist-credentials: true
 
-      - name: Extract and flatten zip
+      # Extract archive
+      - name: Extract zip
+        run: |
+          set -e
+          unzip -o "HoldableTemplate_scotland2_ready.zip"
+
+      # Move extracted contents to repo root (flatten)
+      - name: Move extracted contents to root
         run: |
           set -e
 
-          echo "🔍 Looking for zip in root..."
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" -print -quit)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "❌ No zip found in repo root"
-            exit 1
-          fi
-
-          echo "📦 Extracting $ZIP_FILE..."
-          unzip -o "$ZIP_FILE"
-
-          echo "🔍 Checking for single extracted folder..."
-
-          # find top-level directories (excluding .git)
-          DIR_COUNT=$(find . -maxdepth 1 -type d ! -name "." ! -name ".git" | wc -l)
-
-          if [ "$DIR_COUNT" -eq 1 ]; then
-            TOP_DIR=$(find . -maxdepth 1 -type d ! -name "." ! -name ".git")
-            echo "📁 Found wrapper folder: $TOP_DIR"
-            echo "🚚 Moving contents to root..."
+          if [ -d "HoldableTemplate_scotland2_ready" ]; then
+            echo "📁 Found wrapper folder — flattening..."
             shopt -s dotglob
-            mv "$TOP_DIR"/* .
-            rm -rf "$TOP_DIR"
+            mv HoldableTemplate_scotland2_ready/* .
+            rm -rf HoldableTemplate_scotland2_ready
           else
-            echo "ℹ️ No wrapper folder detected (or multiple folders)"
+            echo "ℹ️ No wrapper folder found — files already at root"
           fi
 
-          echo "🧹 Removing zip..."
-          rm "$ZIP_FILE"
+      # Remove zip after extraction
+      - name: Remove zip
+        run: rm -f HoldableTemplate_scotland2_ready.zip
 
-          echo "✅ Final root contents:"
-          ls -la
+      # Commit and push only if something changed
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Extract zip and move HoldableTemplate to root"
+            git push
+          else
+            echo "No changes to commit"
+          fi
