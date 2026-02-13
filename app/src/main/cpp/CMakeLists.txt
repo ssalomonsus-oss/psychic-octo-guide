@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 🔴 IMPORTANT:
 # Replace these with the REAL source files in your repo
 set(MOXXIE_SOURCES
-    src/moxxie.cpp
+    src/libmoxxie.cpp
 )
 
 add_library(moxxie SHARED ${MOXXIE_SOURCES})
