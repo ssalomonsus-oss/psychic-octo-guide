@@ -1,20 +1,30 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(moxxie LANGUAGES C CXX)
+project(psychic-octo-guide LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# 🔴 IMPORTANT:
-# Replace these with the REAL source files in your repo
+# ✅ REAL source file (confirmed by you)
 set(MOXXIE_SOURCES
-    src/libmoxxie.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/app/src/main/cpp/libmoxxie.cpp"
 )
+
+# Safety check (helps future debugging)
+if(NOT EXISTS "${MOXXIE_SOURCES}")
+    message(FATAL_ERROR "Missing source file: ${MOXXIE_SOURCES}")
+endif()
 
 add_library(moxxie SHARED ${MOXXIE_SOURCES})
 
-# Android system libs (safe even if unused)
-target_link_libraries(moxxie
-    log
-    android
+# Android log lib (safe)
+find_library(log-lib log)
+if(log-lib)
+    target_link_libraries(moxxie PUBLIC ${log-lib})
+endif()
+
+# Put .so in build root for easier finding
+set_target_properties(moxxie PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
