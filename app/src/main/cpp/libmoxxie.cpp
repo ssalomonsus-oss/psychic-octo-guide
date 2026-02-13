@@ -1,27 +1,71 @@
-cmake_minimum_required(VERSION 3.18)
-project(psychic-octo-guide LANGUAGES C CXX)
+#include <jni.h>
+#include "BNM/Loading.hpp"
+#include "include/Menu/ModMenu.hpp"
+#include "BNM/UnityStructures.hpp"
+#include "BNM/Method.hpp"
+#include "BNM/Class.hpp"
+#include "BNMResolve.hpp"
+#include "BNM/Il2CppHeaders.hpp"
+#include <BNMIncludes.hpp>
+#include <NotiLib/NotiLib.hpp>
+#include <httplib.h>
+#include <json.hpp>
+#include <random>
+#include <string>
+#include <BNM/Class.hpp>
+#include <BNM/Method.hpp>
+#include <BNM/Field.hpp>
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+//----- Variables -----\\-
+//Methods -----
 
-# Subdirectory CMakeLists: current dir is app/src/main/cpp, so refer only to libmoxxie.cpp
-set(MOXXIE_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/libmoxxie.cpp"
-    # or simply: "libmoxxie.cpp"
-)
+void (*Awake)(void*);
+void new_Awake(void* instance) {
+    Awake(instance);
+    ModMenu::Init();
 
-if(NOT EXISTS "${MOXXIE_SOURCES}")
-    message(FATAL_ERROR "Missing source file: ${MOXXIE_SOURCES}\nCheck that libmoxxie.cpp is in this directory.")
-endif()
+    BNM_LOG_INFO("Menu Initialization Called");
+}
 
-add_library(moxxie SHARED ${MOXXIE_SOURCES})
+bool isUpdated = true;
+void (*LateUpdate)(void*);
+void new_LateUpdate(void* instance) {
+    LateUpdate(instance);
+    ModMenu::Update();
 
-find_library(log-lib log)
-if(log-lib)
-    target_link_libraries(moxxie PUBLIC ${log-lib})
-endif()
+    if (isUpdated) {
+        BNM_LOG_INFO(BNM_OBFUSCATE("Menu Update Called"));
+        isUpdated = false;
+    }
+}
 
-set_target_properties(moxxie PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-)
+void OnLoaded() {
+    BNM_LOG_INFO(BNM_OBFUSCATE("Hooking Methods Now!!"));
+
+    InvokeHook(Class(BNM_OBFUSCATE("GorillaLocomotion"), BNM_OBFUSCATE("Player"), Image(
+            BNM_OBFUSCATE("Assembly-CSharp.dll"))).GetMethod(BNM_OBFUSCATE("LateUpdate")), new_LateUpdate, LateUpdate);
+
+    InvokeHook(Class(BNM_OBFUSCATE("GorillaLocomotion"), BNM_OBFUSCATE("Player"), Image(
+            BNM_OBFUSCATE("Assembly-CSharp.dll"))).GetMethod(BNM_OBFUSCATE("Awake")), new_Awake, Awake);
+
+    BNM_LOG_INFO(BNM_OBFUSCATE("Hooked Methods..."));
+}
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, [[maybe_unused]] void *reserved) {
+    JNIEnv *env;
+
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        BNM_LOG_ERR("Failed to get JNI environment!");
+        return JNI_ERR;
+    }
+
+    BNM::Loading::AddOnLoadedEvent(OnLoaded);
+
+    BNM_LOG_INFO("loaded! Calling TryLoadByJNI...");
+    if (!BNM::Loading::TryLoadByJNI(env)) {
+        BNM_LOG_ERR("TryLoadByJNI failed!");
+        return JNI_ERR;
+    }
+
+    return JNI_VERSION_1_6;
+}
