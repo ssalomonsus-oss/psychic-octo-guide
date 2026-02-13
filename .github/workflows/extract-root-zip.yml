@@ -12,23 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Find and extract root zip
+      - name: Extract the only zip in root to root
         run: |
           set -e
 
-          echo "Looking for zip in repo root..."
+          echo "🔍 Searching for zip in repo root..."
 
           ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "❌ No zip found in root"
+            echo "❌ No zip found in repo root"
             exit 1
           fi
 
           echo "✅ Found zip: $ZIP_FILE"
+          echo "📦 Extracting into repo root..."
 
-          mkdir -p extracted
-          unzip -o "$ZIP_FILE" -d extracted
+          unzip -o "$ZIP_FILE"
 
-          echo "📦 Extracted contents:"
-          ls -la extracted
+          echo "✅ Done. Root contents:"
+          ls -la
