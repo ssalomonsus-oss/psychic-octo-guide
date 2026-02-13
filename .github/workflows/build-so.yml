@@ -15,55 +15,123 @@ jobs:
       JAVA_VERSION: "17"
 
     steps:
-      - name: Checkout
+      # ----------------------------
+      # Checkout
+      # ----------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
+      # ----------------------------
+      # Java
+      # ----------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
+      # ----------------------------
+      # Android SDK
+      # ----------------------------
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v3
 
-      - name: Install NDK + CMake
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
+
+      # ----------------------------
+      # Install required packages
+      # ----------------------------
+      - name: Install SDK/NDK/CMake
         run: |
-          sdkmanager "platforms;android-${ANDROID_API_LEVEL}" "ndk;${ANDROID_NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+          sdkmanager \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;33.0.2" \
+            "ndk;${ANDROID_NDK_VERSION}" \
+            "cmake;${CMAKE_VERSION}"
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Build arm64 (Gradle)
+      # ----------------------------
+      # Export NDK path
+      # ----------------------------
+      - name: Export ANDROID_NDK_HOME
         run: |
-          ./gradlew :app:assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon || true
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Build arm64 (CMake fallback)
+      # ----------------------------
+      # Debug repo layout (VERY IMPORTANT)
+      # ----------------------------
+      - name: Debug repo tree
         run: |
+          echo "Workspace:"
+          ls -la
+          echo "Depth 4 tree:"
+          find . -maxdepth 4 -print
+
+      # ----------------------------
+      # Try Gradle build FIRST (best for your template)
+      # ----------------------------
+      - name: Build with Gradle
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew :app:assembleRelease \
+            -Pandroid.injected.build.abi=arm64-v8a \
+            --no-daemon || true
+
+      # ----------------------------
+      # Fallback CMake build (only if needed)
+      # ----------------------------
+      - name: CMake fallback
+        run: |
+          set -e
+
+          SRC_DIR="$GITHUB_WORKSPACE/app/src/main/cpp"
+
+          if [ ! -d "$SRC_DIR" ]; then
+            echo "CMake source not found — skipping fallback."
+            exit 0
+          fi
+
           mkdir -p cmake-build
           cd cmake-build
-          cmake -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-${ANDROID_API_LEVEL} -DCMAKE_BUILD_TYPE=Release -S app/src/main/cpp -B .
-          cmake --build . -- -j$(nproc) || true
-          cd ..
 
-      - name: Find .so and upload
+          cmake \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-${ANDROID_API_LEVEL} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -S "$SRC_DIR" -B .
+
+          cmake --build . --config Release -- -j$(nproc) || true
+
+      # ----------------------------
+      # Locate libmoxxie.so
+      # ----------------------------
+      - name: Find libmoxxie.so
         run: |
+          set -e
           mkdir -p output
+
+          echo "Searching for libmoxxie.so..."
+
           SO=$(find . -type f -name "libmoxxie.so" -print -quit || true)
+
           if [ -z "$SO" ]; then
-            SO=$(find app -type f -name "libmoxxie.so" -print -quit || true)
-          fi
-          if [ -z "$SO" ]; then
-            echo "ERROR: libmoxxie.so not found"
-            find . -name "*.so" | head -n 50 || true
+            echo "ERROR: libmoxxie.so not found."
+            echo "Available .so files:"
+            find . -type f -name "*.so" | sed -n '1,200p'
             exit 1
           fi
+
+          echo "Found at: $SO"
           cp "$SO" output/libmoxxie.so
           ls -la output
-      - name: Upload artifact
+
+      # ----------------------------
+      # Upload artifact
+      # ----------------------------
+      - name: Upload libmoxxie.so
         uses: actions/upload-artifact@v4
         with:
-          name: libmoxxie-so
+          name: libmoxxie.so
           path: output/libmoxxie.so
